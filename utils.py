@@ -166,6 +166,17 @@ def check_accuracy(nn_model, testing_data , is_gpu ):
     return accuracy
 
 def save_checkpoint(model, hidden_layers , epochs , training_data , save_dir):
+    """Save the model to the directory
+
+    Args:
+        mode: nn_model to be saved
+        hidden_laters: no of hidden_layers in the model
+        epochs: no of times the model was trained on the data
+        training_data: training data
+        save_dir: the directory where the model was saved
+    Returns:
+        None    
+    """
 
     
     model.class_to_idx = training_data.class_to_idx
