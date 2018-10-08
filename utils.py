@@ -91,27 +91,28 @@ def build_model(arch, hidden_layers, is_gpu):
                               ]))
 
     model.classifier = classifier
-    if is_gpu:
+    if is_gpu and torch.cuda.is_available():
         model.cuda()
     return model
 
-def train_model(model, training_data, epochs, learning_rate, is_gpu):
+def train_model(model, training_data, validation_data, epochs, learning_rate, is_gpu):
     """Train the model
     Args:
         model: NN Model to be trained
         training_data: Trainig data for the model to be trained
+        validation_data: Validation data for checking error
         epochs: no of times the model will go over all the images
         learning_rate: learning rate
         is_gpu: Boolean flag to indicate if GPU is to be used or not
-    
-    
+    Returns:
+        model: The trained neural network model
     """
     criterion = nn.NLLLoss()
     optimizer = optim.Adam(model.classifier.parameters(), learning_rate)
     steps = 0
 
     # change to cuda
-    if is_gpu:
+    if is_gpu and torch.cuda.is_available():
         model.to('cuda')
 
     for e in range(epochs):
@@ -121,7 +122,7 @@ def train_model(model, training_data, epochs, learning_rate, is_gpu):
             no_of_steps_error += 1
             steps += 1
             
-            if is_gpu:
+            if is_gpu and torch.cuda.is_available():
                 inputs, labels = inputs.to('cuda'), labels.to('cuda')
 
             optimizer.zero_grad()
@@ -133,9 +134,24 @@ def train_model(model, training_data, epochs, learning_rate, is_gpu):
             optimizer.step()
 
             running_loss += loss.item()
+        # Evaluate the validation loss and accuracy    
+        val_loss_running = 0
+        no_of_val_steps = 0
+        for _, (inputs_v, labels_v) in enumerate(validation_data):
+            if is_gpu and torch.cuda.is_available():
+                inputs_v, labels_v = inputs_v.to('cuda'), labels_v.to('cuda')
+            optimizer.zero_grad()
+            output_v = model.forward(inputs_v)
+            val_loss = criterion(output_v,labels_v)
+            val_loss_running += val_loss.item()
+            no_of_val_steps +=1
+        
+        val_accuracy = check_accuracy(model, validation_data)
 
         print("Epoch: {}/{}... ".format(e+1, epochs),
-              "Loss: {:.4f}".format(running_loss/no_of_steps_error))
+              "Loss: {:.4f}".format(running_loss/no_of_steps_error),
+              "Validation Loss: {:.4f}".format(val_loss_running/no_of_val_steps),
+              "Validation Accuracy : {:.2f}%".format(val_accuracy*100))
     return model
 
 def check_accuracy(nn_model, testing_data , is_gpu ):
@@ -155,14 +171,13 @@ def check_accuracy(nn_model, testing_data , is_gpu ):
     with torch.no_grad():
         for data in testing_data:
             images, labels = data
-            if is_gpu:
+            if is_gpu and torch.cuda.is_available():
                 images, labels = images.to('cuda'), labels.to('cuda')
             outputs = nn_model(images)
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
     accuracy =  correct / total    
-    print('Accuracy: %d %%' % (100 * correct / total))
     return accuracy
 
 def save_checkpoint(model, hidden_layers , epochs , training_data , save_dir):
